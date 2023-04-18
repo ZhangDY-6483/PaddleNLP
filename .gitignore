@@ -132,3 +132,4 @@ model_zoo/gpt-3/log/
 model_zoo/gpt-3/output/
 model_zoo/gpt-3/my-gpt2_text/
 model_zoo/gpt-3/__MACOSX/
+model_zoo/gpt-3/enwiki_text/

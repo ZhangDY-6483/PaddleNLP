@@ -25,7 +25,7 @@ import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
-# import paddle.incubate.nn.attn_bias as ab
+import paddle.incubate.nn.attn_bias as ab
 from paddle.autograd import PyLayer
 from paddle.common_ops_import import convert_dtype
 from paddle.distributed.fleet.meta_parallel import (
@@ -316,7 +316,6 @@ class MultiHeadAttention(nn.Layer):
         return (out, weights) if self.need_weights else out
     
     def _memory_efficient_attention(self, q, k, v, attn_mask=None):
-        
         if self.sequence_parallel:
             perm = [1, 0, 2, 3]
             q = tensor.transpose(x=q, perm=perm)
@@ -324,10 +323,10 @@ class MultiHeadAttention(nn.Layer):
             v = tensor.transpose(x=v, perm=perm)
             
         if attn_mask is None:
-            mask = paddle.full(shape=[q.shape[0], q.shape[2], q.shape[1], k.shape[1]], fill_value=-np.inf, dtype=p.dtype)
-            attn_mask = paddle.triu(mask, diagonal=1)
-            attn_mask.stop_gradient = False
-            # attn_mask = ab.LowerTriangularMask()
+            # mask = paddle.full(shape=[q.shape[0], q.shape[2], q.shape[1], k.shape[1]], fill_value=-np.inf, dtype=q.dtype)
+            # attn_mask = paddle.triu(mask, diagonal=1)
+            # attn_mask.stop_gradient = False
+            attn_mask = ab.LowerTriangularMask()
             
         out = memory_efficient_attention(
             query=q, 
@@ -404,7 +403,7 @@ class MultiHeadAttention(nn.Layer):
         
         if self.use_flash_attn and attn_mask is None:
             attn_func = self._flash_attention
-        if self.use_memory_attn and not self.need_weights:
+        elif self.use_memory_attn and not self.need_weights:
             attn_func = self._memory_efficient_attention
         else:
             attn_func = self.core_attn
