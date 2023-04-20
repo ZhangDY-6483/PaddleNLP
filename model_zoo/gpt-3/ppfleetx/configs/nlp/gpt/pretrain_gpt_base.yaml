@@ -48,7 +48,7 @@ Data:
       name: GPTDataset
       input_dir: ./data/
       split: [969, 30, 1]
-      max_seq_len: 1024
+      max_seq_len: 32768
     sampler:
       name: GPTBatchSampler
       shuffle: False
@@ -63,7 +63,7 @@ Data:
       name: GPTDataset
       input_dir: ./data/
       split: [969, 30, 1]
-      max_seq_len: 1024
+      max_seq_len: 32768
     sampler:
       name: GPTBatchSampler
       shuffle: False
