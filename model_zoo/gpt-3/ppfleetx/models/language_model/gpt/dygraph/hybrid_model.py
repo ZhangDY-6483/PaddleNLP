@@ -64,7 +64,6 @@ try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
     FusedDropoutAdd = None
-FusedDropoutAdd = None
     
 try:
     from paddle.incubate.nn.memory_efficient_attention import (
@@ -549,6 +548,7 @@ class TransformerDecoderLayer(nn.Layer):
         skip_quant_tensors=[],
         use_flash_attn=False,
         use_memory_attn=False,
+        use_fused_dropout_add=True,
     ):
         self._config = locals()
         self._config.pop("self")
@@ -562,6 +562,10 @@ class TransformerDecoderLayer(nn.Layer):
         self.recompute_granularity = recompute_granularity
         self.sequence_parallel = sequence_parallel
         self.do_recompute = do_recompute
+        if not FusedDropoutAdd:
+            self.use_fused_dropout_add = False
+        else:
+            self.use_fused_dropout_add = use_fused_dropout_add
 
         if sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
@@ -627,7 +631,7 @@ class TransformerDecoderLayer(nn.Layer):
             mark_as_sequence_parallel_parameter(self.norm1.bias)
             mark_as_sequence_parallel_parameter(self.norm2.weight)
             mark_as_sequence_parallel_parameter(self.norm2.bias)
-        if not FusedDropoutAdd:
+        if not self.use_fused_dropout_add:
             self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
             self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
         else:
@@ -656,7 +660,7 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             current_seed = "global_seed"
         with get_rng_state_tracker().rng_state(current_seed):
-            if not FusedDropoutAdd:
+            if not self.use_fused_dropout_add:
                 tgt = residual + self.dropout1(tgt)
             else:
                 tgt = self.fused_dropout_add1(tgt, residual)
@@ -669,7 +673,7 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm2(tgt)
 
         with get_rng_state_tracker().rng_state(current_seed):
-            if not FusedDropoutAdd:
+            if not self.use_fused_dropout_add:
                 tgt = residual + self.linear2(F.gelu(self.linear1(tgt), approximate=True))
             else:
                 tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
@@ -769,6 +773,7 @@ class GPTModelHybrid(nn.Layer):
         use_flash_attn=False,
         use_memory_attn=False,
         fused_softmax_with_triangular=False,
+        use_fused_dropout_add=True,
     ):
 
         super(GPTModelHybrid, self).__init__()
@@ -843,6 +848,7 @@ class GPTModelHybrid(nn.Layer):
                     skip_quant_tensors=skip_tensor_map.get("block_{}".format(i), []),
                     use_flash_attn=use_flash_attn,
                     use_memory_attn=use_memory_attn,
+                    use_fused_dropout_add=use_fused_dropout_add,
                 )
             )
 
@@ -1124,7 +1130,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                 hidden_dropout_prob=hidden_dropout_prob,
                 max_position_embeddings=max_position_embeddings,
                 type_vocab_size=type_vocab_size,
-                initializer_range=0.02,
+                initializer_range=initializer_range,
                 sequence_parallel=sequence_parallel,
             )
         )
@@ -1178,7 +1184,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                 hidden_dropout_prob=hidden_dropout_prob,
                 max_position_embeddings=max_position_embeddings,
                 type_vocab_size=type_vocab_size,
-                initializer_range=0.02,
+                initializer_range=initializer_range,
             )
         )
 
